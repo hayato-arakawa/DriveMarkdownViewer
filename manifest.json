@@ -7,8 +7,7 @@
     "activeTab"
   ],
   "host_permissions": [
-    "https://drive.google.com/*",
-    "https://www.googleapis.com/*"
+    "https://drive.google.com/*"
   ],
   "content_scripts": [
     {

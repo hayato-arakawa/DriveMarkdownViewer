@@ -121,25 +121,7 @@
     return false;
   }
 
-  // ── Fetch File Content via Background Script ───────────────
-  async function fetchFileContent(fileId) {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(
-        { type: 'FETCH_DRIVE_FILE', fileId },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          if (response?.success) {
-            resolve(response.content);
-          } else {
-            reject(new Error(response?.error || 'Unknown error'));
-          }
-        }
-      );
-    });
-  }
+
 
   // ── Extract text from the preview page DOM ─────────────────
   function extractTextFromPage() {
@@ -359,7 +341,7 @@
   }
 
   // ── Toggle Handler ─────────────────────────────────────────
-  async function handleToggle() {
+  function handleToggle() {
     if (isLoading) return;
 
     if (isRendered) {
@@ -371,36 +353,12 @@
     toggleBtn.innerHTML = `<div class="md-spinner"></div><span>読み込み中…</span>`;
 
     try {
-      const fileId = getFileId();
-      if (!fileId) {
-        showError('ファイルIDを取得できませんでした。');
-        return;
-      }
-
-      // 1. Try to extract content from the page DOM first
-      let content = extractTextFromPage();
-
-      // 2. If that fails, try fetching via background script
-      if (!content || content.trim().length < 5) {
-        try {
-          content = await fetchFileContent(fileId);
-        } catch (fetchErr) {
-          console.warn('[MD Viewer] Fetch failed:', fetchErr);
-        }
-      }
+      // Extract content directly from the Drive preview DOM
+      const content = extractTextFromPage();
 
       if (!content || content.trim().length < 2) {
-        showError('ファイルの内容を取得できませんでした。ファイルが共有されているか、アクセス権があることを確認してください。');
+        showError('ファイルの内容を取得できませんでした。Driveプレビューにテキストが表示されていることを確認してください。');
         return;
-      }
-
-      // Check if the fetched content is HTML (error page) rather than markdown
-      if (content.trim().startsWith('<!DOCTYPE') || content.trim().startsWith('<html')) {
-        content = extractTextFromPage();
-        if (!content) {
-          showError('ファイルの内容を取得できませんでした。ページのプレビューからテキストを抽出できません。');
-          return;
-        }
       }
 
       fileContent = content;

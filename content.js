@@ -1,30 +1,48 @@
 /**
  * Drive Markdown Viewer — Content Script
  * Adds a toggle button to the Google Drive file preview toolbar
- * to render Markdown files inline.
+ * to render Markdown files inline within the Drive preview pane.
  */
 (() => {
   'use strict';
   // ── State ──────────────────────────────────────────────────
   let isRendered = false;
-  let overlayEl = null;
   let toggleBtn = null;
   let fileContent = null;
   let isLoading = false;
+  let originalContentEl = null;   // reference to the original text container
+  let mdRenderedEl = null;        // the injected markdown container
+  // ── Selectors (from actual Google Drive DOM) ───────────────
+  // File name element
+  const FILENAME_SELECTOR = 'div.exjswb > span > span > span';
+  // Raw text content (inside <pre>)
+  const TEXT_CONTENT_SELECTOR = 'div.a-b-r > div > div > div > pre';
+  // The parent container where MD should be rendered inline
+  // (the scrollable content area in Drive preview)
+  const INLINE_CONTAINER_SELECTOR = 'div.a-b-r > div > div';
+
   // ── Helpers ────────────────────────────────────────────────
   const FILE_ID_RE = /\/file\/d\/([a-zA-Z0-9_-]+)/;
   function getFileId() {
     const m = location.pathname.match(FILE_ID_RE);
     return m ? m[1] : null;
   }
-  function isMarkdownFile() {
-    // Check the page title or filename in the header
-    const titleEl = document.querySelector('[data-tooltip]') ||
-      document.querySelector('[class*="name"]') ||
-      document.title;
-    const title = typeof titleEl === 'string' ? titleEl : (titleEl?.textContent || '');
-    return /\.md(\s|$|-|–)/i.test(title) || /\.markdown(\s|$|-|–)/i.test(title);
+
+  function getFileName() {
+    // Try the user-provided selector first
+    const el = document.querySelector(FILENAME_SELECTOR);
+    if (el && el.textContent.trim()) {
+      return el.textContent.trim();
+    }
+    // Fallback: page title
+    return document.title || '';
   }
+
+  function isMarkdownFile() {
+    const name = getFileName();
+    return /\.md(\s|$|-|–)/i.test(name) || /\.markdown(\s|$|-|–)/i.test(name);
+  }
+
   // ── SVG Icons ──────────────────────────────────────────────
   const ICON_MD = `<svg class="md-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14 3v4a1 1 0 0 0 1 1h4"/>
@@ -32,15 +50,7 @@
     <path d="M9 15l2-2 2 2"/>
     <path d="M13 13l2 2"/>
   </svg>`;
-  const ICON_CLOSE = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-    <path d="M1 1l12 12M13 1L1 13"/>
-  </svg>`;
-  const ICON_MD_HEADER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="3"/>
-    <path d="M7 15V9l2.5 3L12 9v6"/>
-    <path d="M15 13l2 2 2-2"/>
-    <path d="M17 15V9"/>
-  </svg>`;
+
   // ── Create Toggle Button ───────────────────────────────────
   function createToggleButton() {
     const btn = document.createElement('button');
@@ -51,13 +61,12 @@
     btn.addEventListener('click', handleToggle);
     return btn;
   }
+
   // ── Insert Button into Toolbar ─────────────────────────────
   function insertButton() {
     if (document.getElementById('md-viewer-toggle')) return;
     // Strategy: find the toolbar/action bar at the top of file preview
-    // Google Drive uses different structures, try multiple selectors
     const selectors = [
-      // The header action bar area — look for the "Open with" or "Share" buttons
       '[data-tooltip="Google ドキュメント で開く"]',
       '[data-tooltip="Open with Google Docs"]',
       '[aria-label="Google ドキュメント で開く"]',
@@ -73,7 +82,6 @@
       if (anchorEl) break;
     }
     if (anchorEl) {
-      // Walk up to the parent container that holds the buttons
       const container = anchorEl.closest('[role="toolbar"]') ||
         anchorEl.closest('[class*="header"]') ||
         anchorEl.parentElement?.parentElement ||
@@ -84,7 +92,7 @@
         return true;
       }
     }
-    // Fallback: try to find any toolbar-like container at the top
+    // Fallback selectors
     const fallbackSelectors = [
       '[role="toolbar"]',
       '[class*="toolbar"]',
@@ -98,10 +106,9 @@
         return true;
       }
     }
-    // Last resort: find the top header bar and append
+    // Last resort: header
     const headers = document.querySelectorAll('header, [role="banner"]');
     for (const header of headers) {
-      // Find the right side of the header (where action buttons live)
       const rightSide = header.querySelector('[style*="flex"]') ||
         header.querySelector('[class*="right"]') ||
         header.lastElementChild;
@@ -113,7 +120,8 @@
     }
     return false;
   }
-  // ── Fetch File Content ─────────────────────────────────────
+
+  // ── Fetch File Content via Background Script ───────────────
   async function fetchFileContent(fileId) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -132,24 +140,36 @@
       );
     });
   }
-  // ── Extract text from the preview page itself ──────────────
+
+  // ── Extract text from the preview page DOM ─────────────────
   function extractTextFromPage() {
-    // Google Drive renders text files in the preview area
-    // Try to find the text content containers
-    const previewSelectors = [
+    // Primary: use user-provided selector for <pre> content
+    const preEl = document.querySelector(TEXT_CONTENT_SELECTOR);
+    if (preEl && preEl.textContent.trim().length > 0) {
+      return preEl.textContent;
+    }
+    // Broader search: try to find <pre> inside the Drive preview area
+    const preElements = document.querySelectorAll('div.a-b-r pre, div.a-b-ah pre');
+    for (const el of preElements) {
+      if (el.textContent.trim().length > 0) {
+        return el.textContent;
+      }
+    }
+    // Legacy fallback selectors
+    const fallbackSelectors = [
       '.drive-viewer-text-page',
       '[class*="text-page"]',
       '[class*="viewer"] [class*="content"]',
       '[class*="preview"] [class*="content"]',
-      '.ndfHFb-c4YZDc-Wrber',  // Known Drive preview content class
+      '.ndfHFb-c4YZDc-Wrber',
     ];
-    for (const sel of previewSelectors) {
+    for (const sel of fallbackSelectors) {
       const el = document.querySelector(sel);
       if (el && el.textContent.trim().length > 0) {
         return el.textContent;
       }
     }
-    // Try to find any large text block in the page that looks like file content
+    // Try any element with white-space styling
     const allDivs = document.querySelectorAll('div[style*="white-space"]');
     for (const div of allDivs) {
       if (div.textContent.trim().length > 20) {
@@ -158,16 +178,32 @@
     }
     return null;
   }
+
+  // ── Find the inline container where MD should be rendered ──
+  function findInlineContainer() {
+    // Primary selector from user
+    const container = document.querySelector(INLINE_CONTAINER_SELECTOR);
+    if (container) return container;
+    // Broader fallback
+    const fallbacks = [
+      'div.a-b-r > div > div',
+      'div.a-b-ah > div > div',
+    ];
+    for (const sel of fallbacks) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
+
   // ── Render Markdown ────────────────────────────────────────
   function renderMarkdown(rawText) {
-    // Configure marked
     if (typeof marked !== 'undefined') {
       marked.setOptions({
         gfm: true,
         breaks: true,
       });
       let html = marked.parse(rawText);
-      // Sanitize with DOMPurify if available
       if (typeof DOMPurify !== 'undefined') {
         html = DOMPurify.sanitize(html, {
           USE_PROFILES: { html: true },
@@ -176,34 +212,68 @@
       }
       return html;
     }
-    // Fallback: very basic markdown rendering
     return basicMarkdownRender(rawText);
   }
+
   function basicMarkdownRender(text) {
-    // Ultra-basic markdown for when marked.js isn't available
     let html = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    // Headers
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-    // Bold / italic
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    // Code
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    // Line breaks
     html = html.replace(/\n/g, '<br>');
     return html;
   }
-  // ── Create Overlay ─────────────────────────────────────────
-  function createOverlay(htmlContent) {
-    if (overlayEl) {
-      overlayEl.remove();
+
+  // ── Show Markdown Inline (inside Drive preview container) ──
+  function showMarkdownInline(htmlContent) {
+    const container = findInlineContainer();
+    if (!container) {
+      // Fallback: show as overlay if container not found
+      showAsOverlay(htmlContent);
+      return;
     }
-    overlayEl = document.createElement('div');
+
+    // Hide all original children
+    for (const child of container.children) {
+      if (!child.classList.contains('md-viewer-inline')) {
+        child._mdOriginalDisplay = child.style.display;
+        child.style.display = 'none';
+      }
+    }
+    originalContentEl = container;
+
+    // Create the inline markdown view
+    mdRenderedEl = document.createElement('div');
+    mdRenderedEl.className = 'md-viewer-inline md-viewer-content';
+    mdRenderedEl.id = 'md-viewer-rendered';
+    mdRenderedEl.innerHTML = htmlContent;
+    container.appendChild(mdRenderedEl);
+
+    // Animate in
+    requestAnimationFrame(() => {
+      mdRenderedEl.classList.add('md-viewer-inline-visible');
+    });
+  }
+
+  // ── Fallback: overlay mode (only when inline container not found) ──
+  function showAsOverlay(htmlContent) {
+    const ICON_CLOSE = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M1 1l12 12M13 1L1 13"/>
+    </svg>`;
+    const ICON_MD_HEADER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3"/>
+      <path d="M7 15V9l2.5 3L12 9v6"/>
+      <path d="M15 13l2 2 2-2"/>
+      <path d="M17 15V9"/>
+    </svg>`;
+
+    const overlayEl = document.createElement('div');
     overlayEl.className = 'md-viewer-overlay';
     overlayEl.id = 'md-viewer-overlay';
     overlayEl.innerHTML = `
@@ -222,38 +292,61 @@
       </div>
     `;
     document.body.appendChild(overlayEl);
-    // Attach close handler
+
     document.getElementById('md-viewer-close').addEventListener('click', () => {
-      hideOverlay();
+      hideMarkdown();
     });
-    // ESC to close
     document.addEventListener('keydown', handleEscape);
-    // Animate in
+
     requestAnimationFrame(() => {
       overlayEl.classList.add('md-viewer-visible');
     });
   }
-  function hideOverlay() {
-    if (!overlayEl) return;
-    overlayEl.classList.remove('md-viewer-visible');
-    setTimeout(() => {
-      overlayEl?.remove();
-      overlayEl = null;
-    }, 350);
+
+  // ── Hide Markdown / Restore Original ───────────────────────
+  function hideMarkdown() {
+    // If inline mode was used
+    if (mdRenderedEl && originalContentEl) {
+      mdRenderedEl.classList.remove('md-viewer-inline-visible');
+      setTimeout(() => {
+        mdRenderedEl?.remove();
+        mdRenderedEl = null;
+        // Restore original children
+        if (originalContentEl) {
+          for (const child of originalContentEl.children) {
+            if (child._mdOriginalDisplay !== undefined) {
+              child.style.display = child._mdOriginalDisplay;
+              delete child._mdOriginalDisplay;
+            }
+          }
+          originalContentEl = null;
+        }
+      }, 300);
+    }
+
+    // If overlay mode was used
+    const overlayEl = document.getElementById('md-viewer-overlay');
+    if (overlayEl) {
+      overlayEl.classList.remove('md-viewer-visible');
+      setTimeout(() => overlayEl.remove(), 350);
+      document.removeEventListener('keydown', handleEscape);
+    }
+
     isRendered = false;
     if (toggleBtn) {
       toggleBtn.classList.remove('md-viewer-active');
       toggleBtn.innerHTML = `${ICON_MD}<span>MD</span>`;
       toggleBtn.title = 'Markdownとしてレンダリング';
     }
-    document.removeEventListener('keydown', handleEscape);
   }
+
   function handleEscape(e) {
     if (e.key === 'Escape') {
-      hideOverlay();
+      hideMarkdown();
     }
   }
-  // ── Show Error ─────────────────────────────────────────────
+
+  // ── Show Error (inline) ────────────────────────────────────
   function showError(message) {
     const html = `
       <div class="md-viewer-error">
@@ -262,26 +355,32 @@
         <p>${message}</p>
       </div>
     `;
-    createOverlay(html);
+    showMarkdownInline(html);
   }
+
   // ── Toggle Handler ─────────────────────────────────────────
   async function handleToggle() {
     if (isLoading) return;
+
     if (isRendered) {
-      hideOverlay();
+      hideMarkdown();
       return;
     }
+
     isLoading = true;
     toggleBtn.innerHTML = `<div class="md-spinner"></div><span>読み込み中…</span>`;
+
     try {
       const fileId = getFileId();
       if (!fileId) {
         showError('ファイルIDを取得できませんでした。');
         return;
       }
-      // Try to get content from the page itself first
+
+      // 1. Try to extract content from the page DOM first
       let content = extractTextFromPage();
-      // If that fails, try fetching via background script
+
+      // 2. If that fails, try fetching via background script
       if (!content || content.trim().length < 5) {
         try {
           content = await fetchFileContent(fileId);
@@ -289,22 +388,27 @@
           console.warn('[MD Viewer] Fetch failed:', fetchErr);
         }
       }
+
       if (!content || content.trim().length < 2) {
         showError('ファイルの内容を取得できませんでした。ファイルが共有されているか、アクセス権があることを確認してください。');
         return;
       }
+
       // Check if the fetched content is HTML (error page) rather than markdown
       if (content.trim().startsWith('<!DOCTYPE') || content.trim().startsWith('<html')) {
-        // Try to extract text from the preview instead
         content = extractTextFromPage();
         if (!content) {
           showError('ファイルの内容を取得できませんでした。ページのプレビューからテキストを抽出できません。');
           return;
         }
       }
+
       fileContent = content;
       const renderedHtml = renderMarkdown(content);
-      createOverlay(renderedHtml);
+
+      // Show inline within Drive preview, NOT as fullscreen overlay
+      showMarkdownInline(renderedHtml);
+
       isRendered = true;
       toggleBtn.classList.add('md-viewer-active');
       toggleBtn.innerHTML = `${ICON_MD}<span>元に戻す</span>`;
@@ -319,27 +423,31 @@
       }
     }
   }
+
   // ── Observe DOM and Insert Button ──────────────────────────
   function init() {
-    // Only activate on markdown-ish files or try anyway
-    // since detecting file type from title is unreliable at first load
     const fileId = getFileId();
     if (!fileId) return;
+
     // Try to insert immediately
     if (insertButton()) return;
+
     // Otherwise, watch for the toolbar to appear
     const observer = new MutationObserver((mutations, obs) => {
       if (insertButton()) {
         obs.disconnect();
       }
     });
+
     observer.observe(document.body, {
       childList: true,
       subtree: true,
     });
+
     // Failsafe: stop observing after 30s
     setTimeout(() => observer.disconnect(), 30000);
   }
+
   // ── Kick off ───────────────────────────────────────────────
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

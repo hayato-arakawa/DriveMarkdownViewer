@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Drive Markdown Viewer",
+  "description": "Google Drive上のMarkdownファイルをレンダリングして表示するChrome拡張",
+  "version": "1.0.0",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://drive.google.com/*",
+    "https://www.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://drive.google.com/file/d/*/view*"
+      ],
+      "js": [
+        "lib/marked.min.js",
+        "lib/purify.min.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/*",
+        "content.css"
+      ],
+      "matches": [
+        "https://drive.google.com/*"
+      ]
+    }
+  ]
+}

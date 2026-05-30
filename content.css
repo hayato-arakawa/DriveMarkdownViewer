@@ -1,0 +1,406 @@
+/* ============================================================
+   Drive Markdown Viewer — Content Styles
+   ============================================================ */
+/* ── Toggle Button ───────────────────────────────────────── */
+.md-viewer-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 18px;
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  white-space: nowrap;
+  user-select: none;
+  outline: none;
+  position: relative;
+  overflow: hidden;
+  margin-left: 8px;
+}
+
+/* Inactive state — blends with Drive header */
+.md-viewer-toggle-btn:not(.md-viewer-active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8eaed;
+}
+
+.md-viewer-toggle-btn:not(.md-viewer-active):hover {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+}
+
+/* Active state — highlighted with accent */
+.md-viewer-toggle-btn.md-viewer-active {
+  background: linear-gradient(135deg, #8ab4f8, #669df6);
+  color: #202124;
+  box-shadow: 0 1px 4px rgba(138, 180, 248, 0.4);
+}
+
+.md-viewer-toggle-btn.md-viewer-active:hover {
+  background: linear-gradient(135deg, #aecbfa, #8ab4f8);
+  box-shadow: 0 2px 6px rgba(138, 180, 248, 0.5);
+}
+
+.md-viewer-toggle-btn:active {
+  transform: scale(0.97);
+}
+
+/* Ripple effect */
+.md-viewer-toggle-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255, 255, 255, 0.3) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.md-viewer-toggle-btn:active::after {
+  opacity: 1;
+  transition: opacity 0s;
+}
+
+/* Icon inside button */
+.md-viewer-toggle-btn .md-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Loading spinner */
+.md-viewer-toggle-btn .md-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: md-spin 0.7s linear infinite;
+}
+
+@keyframes md-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Rendered Markdown Overlay ───────────────────────────── */
+.md-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: #1a1a2e;
+  overflow-y: auto;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.md-viewer-overlay.md-viewer-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ── Sticky Header Bar ───────────────────────────────────── */
+.md-viewer-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 32px;
+  background: rgba(26, 26, 46, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(138, 180, 248, 0.12);
+}
+
+.md-viewer-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #8ab4f8;
+}
+
+.md-viewer-header-title svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.md-viewer-close-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(138, 180, 248, 0.25);
+  border-radius: 16px;
+  background: transparent;
+  color: #e8eaed;
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.md-viewer-close-btn:hover {
+  background: rgba(138, 180, 248, 0.12);
+  border-color: rgba(138, 180, 248, 0.4);
+}
+
+/* ── Markdown Content Container ──────────────────────────── */
+.md-viewer-content {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  color: #e0e0e8;
+  line-height: 1.7;
+  font-size: 16px;
+}
+
+/* ── Typography ──────────────────────────────────────────── */
+.md-viewer-content h1,
+.md-viewer-content h2,
+.md-viewer-content h3,
+.md-viewer-content h4,
+.md-viewer-content h5,
+.md-viewer-content h6 {
+  color: #f0f0f8;
+  font-weight: 600;
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+  line-height: 1.3;
+  position: relative;
+}
+
+.md-viewer-content h1 {
+  font-size: 2em;
+  padding-bottom: 0.4em;
+  border-bottom: 2px solid rgba(138, 180, 248, 0.2);
+}
+
+.md-viewer-content h2 {
+  font-size: 1.6em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid rgba(138, 180, 248, 0.12);
+}
+
+.md-viewer-content h3 {
+  font-size: 1.3em;
+}
+
+.md-viewer-content h4 {
+  font-size: 1.1em;
+}
+
+.md-viewer-content h5 {
+  font-size: 1em;
+}
+
+.md-viewer-content h6 {
+  font-size: 0.9em;
+  color: #a0a0b8;
+}
+
+.md-viewer-content p {
+  margin: 0 0 1.2em;
+}
+
+/* ── Links ───────────────────────────────────────────────── */
+.md-viewer-content a {
+  color: #8ab4f8;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.md-viewer-content a:hover {
+  color: #aecbfa;
+  border-bottom-color: #aecbfa;
+}
+
+/* ── Lists ───────────────────────────────────────────────── */
+.md-viewer-content ul,
+.md-viewer-content ol {
+  margin: 0 0 1.2em;
+  padding-left: 1.8em;
+}
+
+.md-viewer-content li {
+  margin-bottom: 0.3em;
+}
+
+.md-viewer-content li>p {
+  margin-bottom: 0.4em;
+}
+
+/* ── Blockquote ──────────────────────────────────────────── */
+.md-viewer-content blockquote {
+  margin: 0 0 1.2em;
+  padding: 12px 20px;
+  border-left: 4px solid #8ab4f8;
+  background: rgba(138, 180, 248, 0.06);
+  border-radius: 0 8px 8px 0;
+  color: #c0c0d8;
+}
+
+.md-viewer-content blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Inline Code ─────────────────────────────────────────── */
+.md-viewer-content code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Cascadia Code', monospace;
+  font-size: 0.88em;
+  padding: 2px 7px;
+  background: rgba(138, 180, 248, 0.1);
+  border: 1px solid rgba(138, 180, 248, 0.15);
+  border-radius: 5px;
+  color: #c8d6f8;
+  word-break: break-word;
+}
+
+/* ── Code Blocks ─────────────────────────────────────────── */
+.md-viewer-content pre {
+  margin: 0 0 1.5em;
+  padding: 20px 24px;
+  background: #12122a;
+  border: 1px solid rgba(138, 180, 248, 0.1);
+  border-radius: 10px;
+  overflow-x: auto;
+  position: relative;
+}
+
+.md-viewer-content pre code {
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 0.9em;
+  line-height: 1.6;
+  color: #d4d4e8;
+}
+
+/* ── Tables ──────────────────────────────────────────────── */
+.md-viewer-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.5em;
+  font-size: 0.95em;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.md-viewer-content thead th {
+  background: rgba(138, 180, 248, 0.1);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 2px solid rgba(138, 180, 248, 0.2);
+  color: #c8d6f8;
+}
+
+.md-viewer-content tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.md-viewer-content tbody tr:hover {
+  background: rgba(138, 180, 248, 0.04);
+}
+
+/* ── Horizontal Rule ─────────────────────────────────────── */
+.md-viewer-content hr {
+  border: none;
+  height: 1px;
+  margin: 2em 0;
+  background: linear-gradient(90deg, transparent, rgba(138, 180, 248, 0.25), transparent);
+}
+
+/* ── Images ──────────────────────────────────────────────── */
+.md-viewer-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Task Lists ──────────────────────────────────────────── */
+.md-viewer-content input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: #8ab4f8;
+}
+
+/* ── Strong / Em ─────────────────────────────────────────── */
+.md-viewer-content strong {
+  color: #f0f0f8;
+  font-weight: 600;
+}
+
+.md-viewer-content em {
+  color: #c8c8e0;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+.md-viewer-overlay::-webkit-scrollbar {
+  width: 8px;
+}
+
+.md-viewer-overlay::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.md-viewer-overlay::-webkit-scrollbar-thumb {
+  background: rgba(138, 180, 248, 0.2);
+  border-radius: 4px;
+}
+
+.md-viewer-overlay::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 180, 248, 0.35);
+}
+
+/* ── Error State ─────────────────────────────────────────── */
+.md-viewer-error {
+  text-align: center;
+  padding: 48px 24px;
+  color: #f28b82;
+}
+
+.md-viewer-error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.md-viewer-error h3 {
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: #f28b82;
+  margin-bottom: 8px;
+}
+
+.md-viewer-error p {
+  font-size: 14px;
+  color: #9aa0a6;
+  max-width: 400px;
+  margin: 0 auto;
+}
